@@ -96,11 +96,14 @@ for _ in range(1,1000):
     # print(plants_model.summary())
 
     plants_train = plants_model.fit(train_X, train_label, batch_size=batch_size,epochs=epochs,verbose=1,validation_data=(valid_X, valid_label))
-    # print(plants_train.history.keys())
+    print(plants_train.history.keys())
     # print(plants_train.history['accuracy'])
-    if  plants_train.history['accuracy'][len(plants_train.history['accuracy'])-1] > best_accuracy:
+    if  plants_train.history['val_accuracy'][len(plants_train.history['val_accuracy'])-1] > best_accuracy:
+        best_accuracy = plants_train.history['accuracy'][len(plants_train.history['val_accuracy'])-1]
         best_activations = activations
         best_node_count = node_count
+    if (1-best_accuracy) < 0.01:
+        break
 
 activations = best_activations
 node_count = best_node_count
