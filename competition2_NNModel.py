@@ -2,6 +2,7 @@ import numpy as np # linear algebra
 import pandas as pd # data processing, CSV file I/O (e.g. pd.read_csv)
 import seaborn as sns
 import matplotlib.pyplot as plt
+import random
 # import warnings
 import warnings
 # filter warnings
@@ -57,29 +58,35 @@ from keras.layers import Conv2D, MaxPooling2D
 from keras.layers import BatchNormalization
 from keras.layers import LeakyReLU
 
-batch_size = 1000
-epochs = 20
+batch_size = 200
+epochs = 100
 
 available_functions = ['linear', 'relu', 'sigmoid', 'softmax', 'softplus', 'softsign','tanh','selu','elu','exponential']
 function_count = 4
 
 best_accuracy = 0
 best_activations = []
-for i in range(1,100):
+best_node_count = []
+for _ in range(1,1000):
     activations = np.random.choice(available_functions, size=function_count)
+    random_list = []
+    for _ in range(function_count):
+        random_list.append(random.randint(10, 300))
+        
+    node_count = random_list
     
     plants_model = Sequential()
-    plants_model.add(Conv2D(32, kernel_size=(3, 3),activation=activations[0],input_shape=(32,32,3),padding='same'))
+    plants_model.add(Conv2D(node_count[0], kernel_size=(3, 3),activation=activations[0],input_shape=(32,32,3),padding='same'))
     plants_model.add(LeakyReLU(alpha=0.1))
     plants_model.add(MaxPooling2D((2, 2),padding='same'))
-    plants_model.add(Conv2D(64, (3, 3), activation=activations[1],padding='same'))
+    plants_model.add(Conv2D(node_count[1], (3, 3), activation=activations[1],padding='same'))
     plants_model.add(LeakyReLU(alpha=0.1))
     plants_model.add(MaxPooling2D(pool_size=(2, 2),padding='same'))
-    plants_model.add(Conv2D(128, (3, 3), activation=activations[2],padding='same'))
+    plants_model.add(Conv2D(node_count[2], (3, 3), activation=activations[2],padding='same'))
     plants_model.add(LeakyReLU(alpha=0.1))                  
     plants_model.add(MaxPooling2D(pool_size=(2, 2),padding='same'))
     plants_model.add(Flatten())
-    plants_model.add(Dense(128, activation=activations[3]))
+    plants_model.add(Dense(node_count[3], activation=activations[3]))
     plants_model.add(LeakyReLU(alpha=0.1))                  
     plants_model.add(Dropout(0.3))
     plants_model.add(Dense(num_classes, activation='softmax'))
@@ -93,21 +100,23 @@ for i in range(1,100):
     # print(plants_train.history['accuracy'])
     if  plants_train.history['accuracy'][len(plants_train.history['accuracy'])-1] > best_accuracy:
         best_activations = activations
+        best_node_count = node_count
 
 activations = best_activations
-
+node_count = best_node_count
+print(best_accuracy)
 plants_model = Sequential()
-plants_model.add(Conv2D(32, kernel_size=(3, 3),activation=activations[0],input_shape=(32,32,3),padding='same'))
+plants_model.add(Conv2D(node_count[0], kernel_size=(3, 3),activation=activations[0],input_shape=(32,32,3),padding='same'))
 plants_model.add(LeakyReLU(alpha=0.1))
 plants_model.add(MaxPooling2D((2, 2),padding='same'))
-plants_model.add(Conv2D(64, (3, 3), activation=activations[1],padding='same'))
+plants_model.add(Conv2D(node_count[1], (3, 3), activation=activations[1],padding='same'))
 plants_model.add(LeakyReLU(alpha=0.1))
 plants_model.add(MaxPooling2D(pool_size=(2, 2),padding='same'))
-plants_model.add(Conv2D(128, (3, 3), activation=activations[2],padding='same'))
+plants_model.add(Conv2D(node_count[2], (3, 3), activation=activations[2],padding='same'))
 plants_model.add(LeakyReLU(alpha=0.1))                  
 plants_model.add(MaxPooling2D(pool_size=(2, 2),padding='same'))
 plants_model.add(Flatten())
-plants_model.add(Dense(128, activation=activations[3]))
+plants_model.add(Dense(node_count[3], activation=activations[3]))
 plants_model.add(LeakyReLU(alpha=0.1))                  
 plants_model.add(Dropout(0.3))
 plants_model.add(Dense(num_classes, activation='softmax'))
@@ -115,6 +124,7 @@ plants_model.add(Dense(num_classes, activation='softmax'))
 plants_model.compile(loss=keras.losses.categorical_crossentropy, optimizer=keras.optimizers.Adam(),metrics=['accuracy'])
 
 print(plants_model.summary())
+print(activations)
 
 plants_train = plants_model.fit(train_X, train_label, batch_size=batch_size,epochs=epochs,verbose=1,validation_data=(valid_X, valid_label))
 
@@ -132,4 +142,4 @@ response = pd.DataFrame(
         }
 )
 
-# response.to_csv('response.csv', index=False)
+response.to_csv('response.csv', index=False)
