@@ -3,36 +3,37 @@ import pandas as pd # data processing, CSV file I/O (e.g. pd.read_csv)
 import seaborn as sns
 import matplotlib.pyplot as plt
 import random
-# import warnings
 import warnings
-# filter warnings
 warnings.filterwarnings('ignore')
 np.random.seed(202505)
 
+# Read data from files
 test = pd.read_csv('test.csv')
 train = pd.read_csv('train.csv')
 # print(train.columns)
-Y_train = train["y"]
 
+# Split Training into X and y
+Y_train = train["y"]
 X_train = train.drop(labels = ["y"],axis = 1) 
 X_train = X_train.set_index('id')
 id_test = test['id']
 # print(id_test)
 test = test.set_index('id')
+print("x_train shape: ", X_train.shape)
+print("test shape: ", test.shape)
 
-
-print("x_train shape: ",X_train.shape)
-print("test shape: ",test.shape)
+# Reshape into 3D array
 X_train = X_train.values.reshape(-1,32,32,3)
 test = test.values.reshape(-1,32,32,3)
-print("x_train shape: ",X_train.shape)
-print("test shape: ",test.shape)
+print("x_train shape: ", X_train.shape)
+print("test shape: ", test.shape)
 
 from keras import utils                                   # tools for creating one-hot encoding
+# Turn category into seperate columns
 num_classes = 4
 Y_train = utils.to_categorical(Y_train, num_classes = num_classes)
 
-
+# Split into training and validation data
 train_index = np.random.choice(range(1,len(X_train)), size=len(X_train)//2)
 # print(train_index)
 val_index = []
@@ -58,6 +59,7 @@ from keras.layers import Conv2D, MaxPooling2D
 from keras.layers import BatchNormalization
 from keras.layers import LeakyReLU
 
+# Setup hyper parameters
 batch_size = 200
 epochs = 100
 
@@ -67,22 +69,26 @@ function_count = 4
 best_accuracy = 0
 best_activations = []
 best_node_count = []
+best_kernel = []
 for _ in range(1,1000):
+    # Set Hyper Parameters
     activations = np.random.choice(available_functions, size=function_count)
-    random_list = []
+    node_count = []
+    kernel_list = []
     for _ in range(function_count):
-        random_list.append(random.randint(10, 300))
+        node_count.append(random.randint(10, 1000))
+        k = 2*random.randint(0, 3)+1
+        kernel_list.append((k,k))
         
-    node_count = random_list
-    
+    # Build model
     plants_model = Sequential()
-    plants_model.add(Conv2D(node_count[0], kernel_size=(3, 3),activation=activations[0],input_shape=(32,32,3),padding='same'))
+    plants_model.add(Conv2D(node_count[0], kernel_size=kernel_list[0],activation=activations[0],input_shape=(32,32,3),padding='same'))
     plants_model.add(LeakyReLU(alpha=0.1))
     plants_model.add(MaxPooling2D((2, 2),padding='same'))
-    plants_model.add(Conv2D(node_count[1], (3, 3), activation=activations[1],padding='same'))
+    plants_model.add(Conv2D(node_count[1], kernel_list[1], activation=activations[1],padding='same'))
     plants_model.add(LeakyReLU(alpha=0.1))
     plants_model.add(MaxPooling2D(pool_size=(2, 2),padding='same'))
-    plants_model.add(Conv2D(node_count[2], (3, 3), activation=activations[2],padding='same'))
+    plants_model.add(Conv2D(node_count[2], kernel_list[2], activation=activations[2],padding='same'))
     plants_model.add(LeakyReLU(alpha=0.1))                  
     plants_model.add(MaxPooling2D(pool_size=(2, 2),padding='same'))
     plants_model.add(Flatten())
@@ -94,28 +100,34 @@ for _ in range(1,1000):
     plants_model.compile(loss=keras.losses.categorical_crossentropy, optimizer=keras.optimizers.Adam(),metrics=['accuracy'])
 
     # print(plants_model.summary())
-
+    # Train using training data and validate with validation data
     plants_train = plants_model.fit(train_X, train_label, batch_size=batch_size,epochs=epochs,verbose=1,validation_data=(valid_X, valid_label))
-    print(plants_train.history.keys())
+    # print(plants_train.history.keys())
     # print(plants_train.history['accuracy'])
+    
+    # Check if current model is the best and store parameters if it is
     if  plants_train.history['val_accuracy'][len(plants_train.history['val_accuracy'])-1] > best_accuracy:
         best_accuracy = plants_train.history['accuracy'][len(plants_train.history['val_accuracy'])-1]
         best_activations = activations
         best_node_count = node_count
+        best_kernel = kernel_list
     if (1-best_accuracy) < 0.01:
         break
 
 activations = best_activations
 node_count = best_node_count
+kernel_list = best_kernel
 print(best_accuracy)
+
+# Run model again with best parameters
 plants_model = Sequential()
-plants_model.add(Conv2D(node_count[0], kernel_size=(3, 3),activation=activations[0],input_shape=(32,32,3),padding='same'))
+plants_model.add(Conv2D(node_count[0], kernel_size=kernel_list[0],activation=activations[0],input_shape=(32,32,3),padding='same'))
 plants_model.add(LeakyReLU(alpha=0.1))
 plants_model.add(MaxPooling2D((2, 2),padding='same'))
-plants_model.add(Conv2D(node_count[1], (3, 3), activation=activations[1],padding='same'))
+plants_model.add(Conv2D(node_count[1], kernel_list[1], activation=activations[1],padding='same'))
 plants_model.add(LeakyReLU(alpha=0.1))
 plants_model.add(MaxPooling2D(pool_size=(2, 2),padding='same'))
-plants_model.add(Conv2D(node_count[2], (3, 3), activation=activations[2],padding='same'))
+plants_model.add(Conv2D(node_count[2], kernel_list[2], activation=activations[2],padding='same'))
 plants_model.add(LeakyReLU(alpha=0.1))                  
 plants_model.add(MaxPooling2D(pool_size=(2, 2),padding='same'))
 plants_model.add(Flatten())
@@ -126,18 +138,22 @@ plants_model.add(Dense(num_classes, activation='softmax'))
 
 plants_model.compile(loss=keras.losses.categorical_crossentropy, optimizer=keras.optimizers.Adam(),metrics=['accuracy'])
 
+# Print results of the best model
 print(plants_model.summary())
-print(activations)
+print("Activation functions:",activations)
+print("Nodes:",node_count)
+print("Kernels:",kernel_list)
 
 plants_train = plants_model.fit(train_X, train_label, batch_size=batch_size,epochs=epochs,verbose=1,validation_data=(valid_X, valid_label))
 
-
+# Predict the classification of the test results
 predicted_classes = plants_model.predict(test)
 predicted_classes = np.argmax(np.round(predicted_classes),axis=1)
 
 # print(predicted_classes)
 
 # print(test)
+# Create the output table and store as a csv
 response = pd.DataFrame(
     data={
         'id': id_test,
