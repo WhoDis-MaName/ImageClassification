@@ -10,12 +10,28 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 # Preparation
+```{r}
+library(jpeg)
+library(ISLR2)
+library(keras)
+library(reticulate)
+library(glmnet)
+```
 
 ```{r}
 
+test <- read.csv('test.csv')
+train <- read.csv('train.csv')
+```
 
+```{r}
+
+train_y = to_categorical(train$y)
+train_x = train[,-c(1,2)]
+train_ids = train$id
 
 ```
+
 
 # Data Cleaning
 
