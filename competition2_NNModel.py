@@ -4,6 +4,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import random
 import warnings
+import json
 warnings.filterwarnings('ignore')
 np.random.seed(202505)
 
@@ -61,7 +62,7 @@ from keras.layers import LeakyReLU
 
 # Setup hyper parameters
 batch_size = 200
-epochs = 1000
+epochs = 100
 
 available_functions = ['linear', 'relu', 'sigmoid', 'softmax', 'softplus', 'softsign','tanh','selu','elu','exponential']
 function_count = 4
@@ -70,13 +71,13 @@ best_accuracy = 0
 best_activations = []
 best_node_count = []
 best_kernel = []
-for _ in range(1,10000):
+for i in range(1,100):
     # Set Hyper Parameters
     activations = np.random.choice(available_functions, size=function_count)
     node_count = []
     kernel_list = []
     for _ in range(function_count):
-        node_count.append(random.randint(10, 1000))
+        node_count.append(random.randint(5, 100))
         k = 2*random.randint(0, 3)+1
         kernel_list.append((k,k))
     
@@ -114,18 +115,34 @@ for _ in range(1,10000):
         best_node_count = node_count
         best_kernel = kernel_list
         
-    with open('results_description.txt', 'w') as f:
-        print(plants_model.summary())
-        f.write(str(plants_model.summary()))
-        print("Activation functions:", activations)
-        f.write(' '.join(["Activation functions:", str(activations)]))
-        f.write('\n')
-        print("Nodes:",node_count)
-        f.write(' '.join(["Nodes:", str(node_count)]))
-        f.write('\n')
-        print("Kernels:",kernel_list)
-        f.write(' '.join(["Kernels:", str(kernel_list)]))
-        f.write('\n')
+        current_json = {}
+        try:
+            with open('results_description.json', 'r') as f:
+                current_json = json.load(f)
+        except FileNotFoundError:
+            print("File doesn't exist")
+        
+        with open('results_description.json', 'w') as f:
+            description_dict = {
+                "val_accuracy": best_accuracy,
+                "summary": str(plants_model.summary()),
+                "activation_functions": list(activations),
+                "nodes": list(node_count),
+                "kernels": list(kernel_list)
+            }
+            current_json[str(i)] = description_dict
+            json.dump(current_json,f, indent=4)
+            # print(plants_model.summary())
+            # f.write(str(plants_model.summary()))
+            # print("Activation functions:", activations)
+            # f.write(' '.join(["Activation functions:", str(activations)]))
+            # f.write('\n')
+            # print("Nodes:",node_count)
+            # f.write(' '.join(["Nodes:", str(node_count)]))
+            # f.write('\n')
+            # print("Kernels:",kernel_list)
+            # f.write(' '.join(["Kernels:", str(kernel_list)]))
+            # f.write('\n')
     if (1-best_accuracy) < 0.01:
         break
 
@@ -154,15 +171,18 @@ plants_model.add(Dense(num_classes, activation='softmax'))
 plants_model.compile(loss=keras.losses.categorical_crossentropy, optimizer=keras.optimizers.Adam(),metrics=['accuracy'])
 
 # Print results of the best model
-with open('results_description.txt', 'w') as f:
+with open('results_description.txt', 'a') as f:
     print(plants_model.summary())
-    # f.write(plants_model.summary())
-    print("Activation functions:", list(activations))
-    f.write(' '.join(["Activation functions:", list(activations)]))
+    f.write(str(plants_model.summary()))
+    print("Activation functions:", activations)
+    f.write(' '.join(["Activation functions:", str(activations)]))
+    f.write('\n')
     print("Nodes:",node_count)
-    f.write(' '.join(["Nodes:", list(node_count)]))
+    f.write(' '.join(["Nodes:", str(node_count)]))
+    f.write('\n')
     print("Kernels:",kernel_list)
-    f.write(' '.join(["Kernels:", list(kernel_list)]))
+    f.write(' '.join(["Kernels:", str(kernel_list)]))
+    f.write('\n')
 
 plants_train = plants_model.fit(train_X, train_label, batch_size=batch_size,epochs=epochs,verbose=1,validation_data=(valid_X, valid_label))
 

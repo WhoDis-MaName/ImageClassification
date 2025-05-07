@@ -1,0 +1,70 @@
+{
+    "1": {
+        "val_accuracy": 0.3383333384990692,
+        "summary": "None",
+        "activation_functions": [
+            "softplus",
+            "tanh",
+            "softsign",
+            "tanh"
+        ],
+        "nodes": [
+            183,
+            867,
+            207,
+            228
+        ],
+        "kernels": [
+            [
+                1,
+                1
+            ],
+            [
+                5,
+                5
+            ],
+            [
+                1,
+                1
+            ],
+            [
+                5,
+                5
+            ]
+        ]
+    },
+    "2": {
+        "val_accuracy": 1.0,
+        "summary": "None",
+        "activation_functions": [
+            "selu",
+            "tanh",
+            "softmax",
+            "tanh"
+        ],
+        "nodes": [
+            747,
+            983,
+            775,
+            520
+        ],
+        "kernels": [
+            [
+                7,
+                7
+            ],
+            [
+                5,
+                5
+            ],
+            [
+                1,
+                1
+            ],
+            [
+                1,
+                1
+            ]
+        ]
+    }
+}
