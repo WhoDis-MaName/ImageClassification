@@ -65,7 +65,7 @@ batch_size = 200
 epochs = 100
 
 available_functions = ['linear', 'relu', 'sigmoid', 'softmax', 'softplus', 'softsign','tanh','selu','elu','exponential']
-function_count = 4
+function_count = 3
 
 best_accuracy = 0
 best_activations = []
@@ -77,9 +77,12 @@ for i in range(1,100):
     node_count = []
     kernel_list = []
     for _ in range(function_count):
-        node_count.append(random.randint(5, 100))
+        node_count.append(random.randint(40, 500))
         k = 2*random.randint(0, 3)+1
         kernel_list.append((k,k))
+    activations = np.append(activations, "tanh")
+    node_count.append(70)
+    kernel_list.append((1,1))
     
     
         
@@ -171,7 +174,7 @@ plants_model.add(Dense(num_classes, activation='softmax'))
 plants_model.compile(loss=keras.losses.categorical_crossentropy, optimizer=keras.optimizers.Adam(),metrics=['accuracy'])
 
 # Print results of the best model
-with open('results_description.txt', 'a') as f:
+with open('results_description.txt', 'w') as f:
     print(plants_model.summary())
     f.write(str(plants_model.summary()))
     print("Activation functions:", activations)
