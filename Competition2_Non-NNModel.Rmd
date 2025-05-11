@@ -9,17 +9,167 @@ output: pdf_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+```{r}
+library(jpeg)
+library(randomForest)
+
+set.seed(202505)
+```
+
 # Preparation
 
 ```{r}
+test <- read.csv('test.csv')
+train <- read.csv('train.csv')
 
+train_X <- train[-c(1,2)]
+train_id <- train[1]
+train_Y <- train[2]
+train_Y$y <- as.factor(train_Y$y)
 
-
+test_X <- test[-c(1)]
+test_id <- test[1]
 ```
 
 # Data Cleaning
 
 ```{r}
+dim(train_X)
+dim(test_X)
+str(train_X)
+```
 
 
+```{r}
+convert_row_to_array <- function(img_row, width = 32, height = 32) {
+  # Extract the R, G, B values
+  r_vals <- as.numeric(img_row[grep("^r", names(img_row))])
+  g_vals <- as.numeric(img_row[grep("^g", names(img_row))])
+  b_vals <- as.numeric(img_row[grep("^b", names(img_row))])
+  
+  # Create the 3D array
+  img_array <- array(0, dim = c(height, width, 3))  # [row, col, channel]
+
+  # Fill in each channel
+  img_array[,,1] <- matrix(r_vals, nrow = height, ncol = width, byrow = TRUE)
+  img_array[,,2] <- matrix(g_vals, nrow = height, ncol = width, byrow = TRUE)
+  img_array[,,3] <- matrix(b_vals, nrow = height, ncol = width, byrow = TRUE)
+
+  return(img_array)
+}
+```
+
+
+```{r}
+# Test first row
+
+img <- convert_row_to_array(train_X[1, ])
+plot(c(0,32),c(0,32), type = "n")
+rasterImage(img, 0,0,32,32)
+```
+
+```{r}
+
+# Get all Images
+
+train_images<- lapply(1:nrow(train_X), function(i) convert_row_to_array(train_X[i, ]))
+
+img <- train_images[[1]]
+plot(c(0,32),c(0,32), type = "n")
+rasterImage(img, 0,0,32,32)
+```
+
+```{r}
+h_filter = matrix(c(-1,-1,-1,0,0,0,1,1,1), nrow = 3)
+v_filter = matrix(c(1,1,1,0,0,0,-1,-1,-1), ncol = 3, byrow=TRUE)
+l_filter = matrix(c(-1,-1,-1,-1,8,-1,-1,-1,-1), nrow = 3)
+
+# Test combinations of the filters. Commented combinations are not useful
+# h_v_filter = h_filter %*% v_filter
+v_h_filter = v_filter %*% h_filter
+# h_l_filter = h_filter %*% l_filter
+l_h_filter = l_filter %*% h_filter
+v_l_filter = v_filter %*% l_filter
+#l_v_filter = l_filter %*% v_filter
+
+```
+
+```{r}
+# Try to imitate convolution
+filter_list = c(h_filter, v_filter, l_filter, v_h_filter, l_h_filter, v_l_filter)
+
+convolution <- function(img_row, width = 32, height = 32) {
+  convolution_layer1 = array(NA, dim = c(width,height, length(filter_list)*3))
+  depth = 1
+  for (filter in filter_list){
+    for (color in 1:3){
+      # print(color)
+      input_layer = matrix(0, nrow=height+2, ncol=width+2)
+      input_layer[2:(height+1),2:(width+1)] = img_row[,,color]
+      output_layer = matrix(data=NA, nrow=height, ncol = width)
+      
+      for (row_number in 1:nrow(output_layer)){
+        for (col_number in 1:ncol(output_layer)){
+          output_layer[row_number,col_number] = sum(filter * input_layer[
+            row_number:(row_number+2),
+            col_number:(col_number+2)])
+        }
+      }
+      
+      # Activation Function
+      #output_layer[output_layer < 0] = 0
+
+      convolution_layer1[,,depth] = output_layer
+      depth = depth + 1
+    }
+  }
+  return(convolution_layer1)
+}
+
+```
+
+```{r}
+# Apply convolution
+
+train_convolution<- lapply(1:length(train_images), function(i) convolution(train_images[[i]]))
+```
+
+```{r}
+# Flatten convolution and combine with raw training data
+
+flattened_conv <- lapply(train_convolution, function(conv) as.vector(conv))
+df_conv <- do.call(rbind, flattened_conv)
+
+convoluted_train <- cbind(train_Y, train_X, df_conv)
+
+
+```
+
+# Reduce Redundant parameters
+
+```{r}
+features <- convoluted_train[, -1]
+features <- features[, sapply(features, function(x) length(unique(x)) > 1)]
+
+pca_result <- prcomp(features, center = TRUE, scale. = TRUE)
+
+summary(pca_result)
+pca_data <- as.data.frame(pca_result$x[, 1:200])
+pca_data$y <- df$y
+
+```
+
+
+# Random Forrest Model
+```{r}
+rf_model <- randomForest(
+  y ~ .,
+  data = pca_data,
+  ntree = 25,
+  mtry = 100,
+  importance = TRUE
+)
+
+print(rf_model)
+plot(rf_model)
 ```
