@@ -146,31 +146,80 @@ convoluted_train <- cbind(train_Y, train_X, df_conv)
 # Reduce Redundant parameters
 
 ```{r}
+names(convoluted_train) <- make.names(names(convoluted_train))
 features <- convoluted_train[, -1]
 # Remove constant columns, usually zero
 features <- features[, sapply(features, function(x) length(unique(x)) > 1)]
 
 pca_result <- prcomp(features, center = TRUE, scale. = TRUE)
 
-summary(pca_result)
-pca_data <- as.data.frame(pca_result$x[, 1:1000])
+# summary(pca_result)
+loadings <- abs(pca_result$rotation)
+# Choose number of PCs to consider
+n_pcs <- 5
+
+# Calculate feature importance scores
+importance_scores <- rowSums(loadings[, 1:n_pcs])
+
+# Sort features by score
+sorted_features <- sort(importance_scores, decreasing = TRUE)
+
+# Select top N features
+top_feature_names <- names(sorted_features)[1:300]
 pca_data$y <- convoluted_train$y
+reduced_convoluted_train <- convoluted_train[, top_feature_names]
+reduced_convoluted_train$y <- convoluted_train$y
 
 ```
 
 
-# Random Forrest Model
+# Random Forest Model
 ```{r}
 rf_model <- randomForest(
   y ~ .,
-  data = pca_data,
-  ntree = 25,
-  mtry = 400,
+  data = reduced_convoluted_train,
+  ntree = 1000,
+  mtry = 100,
   importance = TRUE
 )
 
 print(rf_model)
 plot(rf_model)
+```
+
+# XGBoost Model
+```{r}
+library(xgboost)
+```
+
+```{r}
+dtrain <- xgb.DMatrix(data = as.matrix(reduced_convoluted_train[, -301]), label = reduced_convoluted_train$y)
+
+```
+
+```{r}
+params <- list(
+  objective = "multi:softprob",
+  eval_metric = "mlogloss",
+  num_class = length(unique(reduced_convoluted_train$y))+1,
+  eta = 0.1,
+  max_depth = 6,
+  subsample = 0.8,
+  colsample_bytree = 0.8
+)
+```
+
+```{r}
+xgb_model <- xgb.train(
+  params = params,
+  data = dtrain,
+  nrounds = 200,
+  watchlist = list(train = dtrain),
+  verbose = 0
+)
+
+
+
 ```
 
 
@@ -184,12 +233,34 @@ test_flattened_conv <- lapply(test_convolution, function(conv) as.vector(conv))
 test_df_conv <- do.call(rbind, test_flattened_conv)
 
 convoluted_test <- cbind(test_X, test_df_conv)
-test_features <- convoluted_test[,names(features)]
-pca_result_test <- prcomp(test_features, center = TRUE, scale. = TRUE)
+names(convoluted_test) <- make.names(names(convoluted_test))
 
-pca_test <- as.data.frame(pca_result_test$x[, 1:1000])
+test_features <- convoluted_test[,intersect(names(reduced_convoluted_train), names(convoluted_test))]
 
 
-predictions <- predict(rf_model, newdata = pca_test)
+predictions <- predict(rf_model, newdata = test_features)
+```
+
+# XGBoost Prediction
+```{r}
+pred_probs <- predict(xgb_model, newdata = as.matrix(test_features))
+# Reshape predictions into a matrix: rows = samples, cols = classes
+pred_matrix <- matrix(pred_probs, ncol = params$num_class, byrow = TRUE)
+
+# Get predicted classes
+predictions <- max.col(pred_matrix) - 1  # Subtract 1 to match original encoding
+
+```
+
+
+# Store as File
+```{r}
+response <- data.frame(
+  "id" = test_id,
+  "y" = predictions
+)
+
+write.csv(response, "random_tree.csv", row.names = FALSE)
+
 ```
 
