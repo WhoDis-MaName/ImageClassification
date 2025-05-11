@@ -74,12 +74,14 @@ rasterImage(img, 0,0,32,32)
 
 train_images<- lapply(1:nrow(train_X), function(i) convert_row_to_array(train_X[i, ]))
 
+# Confirm by plotting first row
 img <- train_images[[1]]
 plot(c(0,32),c(0,32), type = "n")
 rasterImage(img, 0,0,32,32)
 ```
 
 ```{r}
+# Create filters
 h_filter = matrix(c(-1,-1,-1,0,0,0,1,1,1), nrow = 3)
 v_filter = matrix(c(1,1,1,0,0,0,-1,-1,-1), ncol = 3, byrow=TRUE)
 l_filter = matrix(c(-1,-1,-1,-1,8,-1,-1,-1,-1), nrow = 3)
@@ -91,13 +93,11 @@ v_h_filter = v_filter %*% h_filter
 l_h_filter = l_filter %*% h_filter
 v_l_filter = v_filter %*% l_filter
 #l_v_filter = l_filter %*% v_filter
-
+filter_list = c(h_filter, v_filter, l_filter, v_h_filter, l_h_filter, v_l_filter)
 ```
 
 ```{r}
 # Try to imitate convolution
-filter_list = c(h_filter, v_filter, l_filter, v_h_filter, l_h_filter, v_l_filter)
-
 convolution <- function(img_row, width = 32, height = 32) {
   convolution_layer1 = array(NA, dim = c(width,height, length(filter_list)*3))
   depth = 1
@@ -141,21 +141,20 @@ flattened_conv <- lapply(train_convolution, function(conv) as.vector(conv))
 df_conv <- do.call(rbind, flattened_conv)
 
 convoluted_train <- cbind(train_Y, train_X, df_conv)
-
-
 ```
 
 # Reduce Redundant parameters
 
 ```{r}
 features <- convoluted_train[, -1]
+# Remove constant columns, usually zero
 features <- features[, sapply(features, function(x) length(unique(x)) > 1)]
 
 pca_result <- prcomp(features, center = TRUE, scale. = TRUE)
 
 summary(pca_result)
-pca_data <- as.data.frame(pca_result$x[, 1:200])
-pca_data$y <- df$y
+pca_data <- as.data.frame(pca_result$x[, 1:1000])
+pca_data$y <- convoluted_train$y
 
 ```
 
@@ -166,10 +165,31 @@ rf_model <- randomForest(
   y ~ .,
   data = pca_data,
   ntree = 25,
-  mtry = 100,
+  mtry = 400,
   importance = TRUE
 )
 
 print(rf_model)
 plot(rf_model)
 ```
+
+
+# Get Prediction
+```{r}
+# Process test data
+columns <- names(pca_data)
+test_images<- lapply(1:nrow(test_X), function(i) convert_row_to_array(test_X[i, ]))
+test_convolution<- lapply(1:length(test_images), function(i) convolution(test_images[[i]]))
+test_flattened_conv <- lapply(test_convolution, function(conv) as.vector(conv))
+test_df_conv <- do.call(rbind, test_flattened_conv)
+
+convoluted_test <- cbind(test_X, test_df_conv)
+test_features <- convoluted_test[,names(features)]
+pca_result_test <- prcomp(test_features, center = TRUE, scale. = TRUE)
+
+pca_test <- as.data.frame(pca_result_test$x[, 1:1000])
+
+
+predictions <- predict(rf_model, newdata = pca_test)
+```
+
