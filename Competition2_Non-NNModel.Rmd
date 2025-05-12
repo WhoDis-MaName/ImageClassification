@@ -153,7 +153,6 @@ features <- features[, sapply(features, function(x) length(unique(x)) > 1)]
 
 pca_result <- prcomp(features, center = TRUE, scale. = TRUE)
 
-# summary(pca_result)
 loadings <- abs(pca_result$rotation)
 # Choose number of PCs to consider
 n_pcs <- 5
@@ -164,9 +163,10 @@ importance_scores <- rowSums(loadings[, 1:n_pcs])
 # Sort features by score
 sorted_features <- sort(importance_scores, decreasing = TRUE)
 
+nparams <- length(sorted_features)
+
 # Select top N features
-top_feature_names <- names(sorted_features)[1:300]
-pca_data$y <- convoluted_train$y
+top_feature_names <- names(sorted_features)[1:5000]
 reduced_convoluted_train <- convoluted_train[, top_feature_names]
 reduced_convoluted_train$y <- convoluted_train$y
 
@@ -193,19 +193,19 @@ library(xgboost)
 ```
 
 ```{r}
-dtrain <- xgb.DMatrix(data = as.matrix(reduced_convoluted_train[, -301]), label = reduced_convoluted_train$y)
+dtrain <- xgb.DMatrix(data = as.matrix(subset(reduced_convoluted_train, select = -c(y) )), label = reduced_convoluted_train$y)
 
 ```
 
 ```{r}
 params <- list(
   objective = "multi:softprob",
-  eval_metric = "mlogloss",
+  eval_metric = "merror",
   num_class = length(unique(reduced_convoluted_train$y))+1,
-  eta = 0.1,
-  max_depth = 6,
-  subsample = 0.8,
-  colsample_bytree = 0.8
+  eta = 0.05,
+  max_depth = 35,
+  subsample = 0.6,
+  colsample_bytree = 0.7
 )
 ```
 
@@ -213,7 +213,7 @@ params <- list(
 xgb_model <- xgb.train(
   params = params,
   data = dtrain,
-  nrounds = 200,
+  nrounds = 500,
   watchlist = list(train = dtrain),
   verbose = 0
 )
@@ -226,7 +226,6 @@ xgb_model <- xgb.train(
 # Get Prediction
 ```{r}
 # Process test data
-columns <- names(pca_data)
 test_images<- lapply(1:nrow(test_X), function(i) convert_row_to_array(test_X[i, ]))
 test_convolution<- lapply(1:length(test_images), function(i) convolution(test_images[[i]]))
 test_flattened_conv <- lapply(test_convolution, function(conv) as.vector(conv))
@@ -235,10 +234,8 @@ test_df_conv <- do.call(rbind, test_flattened_conv)
 convoluted_test <- cbind(test_X, test_df_conv)
 names(convoluted_test) <- make.names(names(convoluted_test))
 
-test_features <- convoluted_test[,intersect(names(reduced_convoluted_train), names(convoluted_test))]
 
-
-predictions <- predict(rf_model, newdata = test_features)
+test_features <- convoluted_test[,top_feature_names]
 ```
 
 # XGBoost Prediction
